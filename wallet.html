@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Electroshere Wallet</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #e9f9e9;
+    --card: #ffffff;
+    --dark: #004d00;
+    --green: #008000;
+    --text: #1f2a1f;
+    --muted: #6b7a6b;
+    --border: #d4e8d4;
+    --red: #c62828;
+    --amber: #a86400;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); }
+  header { background: var(--dark); color: #fff; padding: 14px 16px; }
+  header .inner { max-width: 720px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 20px; margin: 0; }
+  header a { color: #cfe9cf; font-size: 14px; text-decoration: none; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .card h2 { margin: 0 0 12px; font-size: 18px; color: var(--dark); }
+  button { font: inherit; cursor: pointer; border: 0; border-radius: 8px; padding: 11px 16px; font-weight: bold; }
+  .primary { background: var(--green); color: #fff; }
+  .primary:disabled { background: #9cbf9c; cursor: not-allowed; }
+  .ghost { background: transparent; color: var(--green); border: 1px solid var(--green); }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .between { justify-content: space-between; }
+  .addr { font-family: monospace; word-break: break-all; font-size: 14px; }
+  .muted { color: var(--muted); font-size: 14px; }
+  select, input { font: inherit; width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text); }
+  label { display: block; font-size: 14px; color: var(--muted); margin: 12px 0 6px; }
+  .asset { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); gap: 12px; }
+  .asset:last-child { border-bottom: 0; }
+  .asset .sym { font-weight: bold; }
+  .asset .bal { font-family: monospace; text-align: right; word-break: break-all; }
+  .icon { width: 34px; height: 34px; border-radius: 50%; background: var(--dark); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: bold; flex: none; }
+  .msg { padding: 10px 12px; border-radius: 8px; font-size: 14px; margin-top: 12px; word-break: break-word; }
+  .msg.err { background: #fdecea; color: var(--red); }
+  .msg.ok { background: #e6f4e6; color: var(--dark); }
+  .msg.warn { background: #fff4e0; color: var(--amber); }
+  .hidden { display: none !important; }
+  .maxbtn { padding: 6px 10px; font-size: 13px; }
+  .tx { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .tx:last-child { border-bottom: 0; }
+  .tx a { color: var(--green); word-break: break-all; }
+  .confirm { background: #f4fff4; border: 1px solid var(--green); border-radius: 10px; padding: 14px; margin-top: 14px; }
+  .confirm dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0 0 12px; font-size: 14px; }
+  .confirm dt { color: var(--muted); }
+  .confirm dd { margin: 0; word-break: break-all; font-family: monospace; }
+  footer { text-align: center; color: var(--muted); font-size: 13px; padding: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="inner">
+    <h1>Electroshere Wallet</h1>
+    <a href="Electroshere.HTML">&larr; Back to site</a>
+  </div>
+</header>
+
+<main>
+  <!-- Connection -->
+  <section class="card" id="connectCard">
+    <h2>Your wallet</h2>
+    <div id="notConnected">
+      <p class="muted">Connect a browser wallet such as MetaMask or Trust Wallet. Your keys stay in your wallet: this site never sees them, and every transfer needs your approval in the wallet.</p>
+      <button class="primary" id="connectBtn">Connect wallet</button>
+    </div>
+    <div id="connected" class="hidden">
+      <div class="row between">
+        <div>
+          <div class="muted">Address</div>
+          <div class="addr" id="myAddr"></div>
+        </div>
+        <button class="ghost" id="copyBtn">Copy</button>
+      </div>
+      <label for="networkSel">Network</label>
+      <select id="networkSel"></select>
+    </div>
+    <div id="connectMsg"></div>
+  </section>
+
+  <!-- Assets -->
+  <section class="card hidden" id="assetsCard">
+    <div class="row between">
+      <h2>Assets</h2>
+      <button class="ghost maxbtn" id="refreshBtn">Refresh</button>
+    </div>
+    <div id="assetList"></div>
+    <details style="margin-top:12px">
+      <summary class="muted" style="cursor:pointer">Add a token by contract address</summary>
+      <div class="row" style="margin-top:8px">
+        <input id="customToken" placeholder="0x… token contract" style="flex:1;min-width:200px">
+        <button class="ghost" id="addTokenBtn">Add</button>
+      </div>
+      <div id="tokenMsg"></div>
+    </details>
+  </section>
+
+  <!-- Send -->
+  <section class="card hidden" id="sendCard">
+    <h2>Send</h2>
+    <label for="assetSel">Asset</label>
+    <select id="assetSel"></select>
+
+    <label for="toAddr">Recipient address</label>
+    <input id="toAddr" placeholder="0x…" autocomplete="off" spellcheck="false">
+
+    <label for="amount">Amount</label>
+    <div class="row">
+      <input id="amount" inputmode="decimal" placeholder="0.0" style="flex:1">
+      <button class="ghost maxbtn" id="maxBtn">Max</button>
+    </div>
+    <div class="muted" id="availLine" style="margin-top:6px"></div>
+
+    <button class="primary" id="reviewBtn" style="margin-top:16px;width:100%">Review transfer</button>
+    <div id="sendMsg"></div>
+
+    <div class="confirm hidden" id="confirmBox">
+      <strong>Check every detail. Blockchain transfers cannot be reversed.</strong>
+      <dl style="margin-top:10px">
+        <dt>Network</dt><dd id="cNet"></dd>
+        <dt>Asset</dt><dd id="cAsset"></dd>
+        <dt>Amount</dt><dd id="cAmt"></dd>
+        <dt>To</dt><dd id="cTo"></dd>
+      </dl>
+      <div class="row">
+        <button class="primary" id="confirmBtn">Confirm &amp; open wallet</button>
+        <button class="ghost" id="cancelBtn">Cancel</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- History -->
+  <section class="card hidden" id="historyCard">
+    <h2>Transfers from this session</h2>
+    <div id="txList"></div>
+  </section>
+</main>
+
+<footer>&copy; 2026 Electroshere Company Ltd</footer>
+
+<script>
+(() => {
+  const { ethers } = window;
+
+  // ---- Network + token configuration ----
+  const NETWORKS = {
+    56: {
+      name: "BNB Smart Chain", hex: "0x38", symbol: "BNB", decimals: 18,
+      rpc: "https://bsc-dataseed.binance.org", explorer: "https://bscscan.com",
+      tokens: [
+        { symbol: "USDT", address: "0x55d398326f99059fF775485246999027B3197955", decimals: 18 },
+        { symbol: "USDC", address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", decimals: 18 },
+      ],
+    },
+    1: {
+      name: "Ethereum", hex: "0x1", symbol: "ETH", decimals: 18,
+      rpc: "https://ethereum-rpc.publicnode.com", explorer: "https://etherscan.io",
+      tokens: [
+        { symbol: "USDT", address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", decimals: 6 },
+        { symbol: "USDC", address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", decimals: 6 },
+      ],
+    },
+    137: {
+      name: "Polygon", hex: "0x89", symbol: "POL", decimals: 18,
+      rpc: "https://polygon-rpc.com", explorer: "https://polygonscan.com",
+      tokens: [
+        { symbol: "USDT", address: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", decimals: 6 },
+      ],
+    },
+  };
+
+  const ERC20_ABI = [
+    "function balanceOf(address) view returns (uint256)",
+    "function decimals() view returns (uint8)",
+    "function symbol() view returns (string)",
+    "function transfer(address to, uint256 amount) returns (bool)",
+  ];
+
+  // ---- State ----
+  let provider = null, signer = null, account = null, chainId = null;
+  let assets = [];            // { key, symbol, address|null, decimals, balance(bigint) }
+  let pending = null;         // transfer under review
+  const customTokens = loadCustom(); // { [chainId]: [{symbol,address,decimals}] }
+
+  const $ = (id) => document.getElementById(id);
+  const show = (el, on = true) => el.classList.toggle("hidden", !on);
+  function msg(target, text, kind = "err") {
+    target.innerHTML = text ? `<div class="msg ${kind}"></div>` : "";
+    if (text) target.firstChild.textContent = text;
+  }
+  function loadCustom() {
+    try { return JSON.parse(localStorage.getItem("es-custom-tokens") || "{}"); } catch { return {}; }
+  }
+  function saveCustom() {
+    try { localStorage.setItem("es-custom-tokens", JSON.stringify(customTokens)); } catch {}
+  }
+  function niceError(e) {
+    if (e?.code === "ACTION_REJECTED" || e?.code === 4001 || e?.info?.error?.code === 4001) return "You rejected the request in your wallet.";
+    if (e?.code === "INSUFFICIENT_FUNDS") return "Not enough funds to cover the amount plus the network fee.";
+    return e?.shortMessage || e?.reason || e?.message || String(e);
+  }
+  function fmt(bal, decimals) {
+    const s = ethers.formatUnits(bal, decimals);
+    const [i, f = ""] = s.split(".");
+    const trimmed = f.slice(0, 6).replace(/0+$/, "");
+    return Number(i).toLocaleString("en-US") + (trimmed ? "." + trimmed : "");
+  }
+
+  // ---- Network select ----
+  for (const [id, n] of Object.entries(NETWORKS)) {
+    const o = document.createElement("option");
+    o.value = id; o.textContent = n.name;
+    $("networkSel").appendChild(o);
+  }
+
+  // ---- Connect ----
+  async function connect() {
+    msg($("connectMsg"), "");
+    if (!window.ethereum) {
+      msg($("connectMsg"), "No wallet found. Install MetaMask (desktop) or open this page inside the Trust Wallet / MetaMask app browser (mobile).");
+      return;
+    }
+    try {
+      provider = new ethers.BrowserProvider(window.ethereum, "any");
+      const accounts = await provider.send("eth_requestAccounts", []);
+      await onAccounts(accounts);
+    } catch (e) {
+      msg($("connectMsg"), niceError(e));
+    }
+  }
+
+  async function onAccounts(accounts) {
+    if (!accounts || !accounts.length) { disconnectUI(); return; }
+    account = ethers.getAddress(accounts[0]);
+    signer = await provider.getSigner(account);
+    chainId = Number((await provider.getNetwork()).chainId);
+    $("myAddr").textContent = account;
+    show($("notConnected"), false); show($("connected"));
+    show($("assetsCard")); show($("sendCard"));
+    syncNetworkSelect();
+    await loadAssets();
+  }
+
+  function disconnectUI() {
+    account = signer = null;
+    show($("notConnected")); show($("connected"), false);
+    ["assetsCard", "sendCard"].forEach((id) => show($(id), false));
+  }
+
+  function syncNetworkSelect() {
+    const sel = $("networkSel");
+    if (NETWORKS[chainId]) {
+      sel.value = String(chainId);
+      msg($("connectMsg"), "");
+    } else {
+      sel.value = "";
+      msg($("connectMsg"), `Your wallet is on an unsupported network (chain ${chainId}). Pick one from the list.`, "warn");
+    }
+  }
+
+  async function switchNetwork(id) {
+    const n = NETWORKS[id];
+    try {
+      await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: n.hex }] });
+    } catch (e) {
+      if (e?.code === 4902) {
+        await window.ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [{ chainId: n.hex, chainName: n.name, rpcUrls: [n.rpc], blockExplorerUrls: [n.explorer],
+                     nativeCurrency: { name: n.symbol, symbol: n.symbol, decimals: n.decimals } }],
+        });
+      } else {
+        msg($("connectMsg"), niceError(e)); syncNetworkSelect();
+      }
+    }
+  }
+
+  // ---- Assets ----
+  async function loadAssets() {
+    const list = $("assetList");
+    const net = NETWORKS[chainId];
+    assets = [];
+    if (!net) { list.innerHTML = '<p class="muted">Switch to a supported network to see assets.</p>'; fillAssetSelect(); return; }
+    list.innerHTML = '<p class="muted">Loading balances…</p>';
+
+    const tokens = [...net.tokens, ...(customTokens[chainId] || [])];
+    const rows = [{ key: "native", symbol: net.symbol, address: null, decimals: net.decimals }, ...tokens.map((t) => ({ key: t.address.toLowerCase(), ...t }))];
+
+    await Promise.all(rows.map(async (a) => {
+      try {
+        a.balance = a.address
+          ? await new ethers.Contract(a.address, ERC20_ABI, provider).balanceOf(account)
+          : await provider.getBalance(account);
+      } catch { a.balance = null; }
+    }));
+    assets = rows;
+    renderAssets();
+    fillAssetSelect();
+  }
+
+  function renderAssets() {
+    const list = $("assetList");
+    list.innerHTML = "";
+    for (const a of assets) {
+      const row = document.createElement("div");
+      row.className = "asset";
+      row.innerHTML = `<div class="row"><div class="icon"></div><div><div class="sym"></div><div class="muted"></div></div></div><div class="bal"></div>`;
+      row.querySelector(".icon").textContent = a.symbol.slice(0, 4);
+      row.querySelector(".sym").textContent = a.symbol;
+      row.querySelector(".muted").textContent = a.address ? short(a.address) : "Native coin";
+      row.querySelector(".bal").textContent = a.balance == null ? "unavailable" : fmt(a.balance, a.decimals);
+      list.appendChild(row);
+    }
+  }
+
+  function fillAssetSelect() {
+    const sel = $("assetSel");
+    const prev = sel.value;
+    sel.innerHTML = "";
+    for (const a of assets) {
+      const o = document.createElement("option");
+      o.value = a.key; o.textContent = a.symbol;
+      sel.appendChild(o);
+    }
+    if (assets.some((a) => a.key === prev)) sel.value = prev;
+    updateAvail();
+  }
+
+  function currentAsset() { return assets.find((a) => a.key === $("assetSel").value); }
+  function short(a) { return a.slice(0, 6) + "…" + a.slice(-4); }
+
+  function updateAvail() {
+    const a = currentAsset();
+    $("availLine").textContent = a && a.balance != null ? `Available: ${fmt(a.balance, a.decimals)} ${a.symbol}` : "";
+  }
+
+  async function addCustomToken() {
+    const addr = $("customToken").value.trim();
+    msg($("tokenMsg"), "");
+    if (!ethers.isAddress(addr)) { msg($("tokenMsg"), "That is not a valid contract address."); return; }
+    try {
+      const c = new ethers.Contract(addr, ERC20_ABI, provider);
+      const [symbol, decimals] = await Promise.all([c.symbol(), c.decimals()]);
+      const list = (customTokens[chainId] ||= []);
+      if (!list.some((t) => t.address.toLowerCase() === addr.toLowerCase())) {
+        list.push({ symbol, address: ethers.getAddress(addr), decimals: Number(decimals) });
+        saveCustom();
+      }
+      $("customToken").value = "";
+      msg($("tokenMsg"), `Added ${symbol}.`, "ok");
+      await loadAssets();
+    } catch (e) {
+      msg($("tokenMsg"), "Could not read that token on this network. Check the address and network.");
+    }
+  }
+
+  // ---- Send ----
+  async function review() {
+    msg($("sendMsg"), "");
+    show($("confirmBox"), false);
+    pending = null;
+
+    const a = currentAsset();
+    const to = $("toAddr").value.trim();
+    const amtStr = $("amount").value.trim().replace(",", ".");
+
+    if (!a) return msg($("sendMsg"), "Choose an asset.");
+    if (!ethers.isAddress(to)) return msg($("sendMsg"), "The recipient address is not valid. It should start with 0x and be 42 characters.");
+    if (to.toLowerCase() === account.toLowerCase()) return msg($("sendMsg"), "That is your own address.");
+    if (a.address && to.toLowerCase() === a.address.toLowerCase()) return msg($("sendMsg"), "That is the token's contract address. Tokens sent there are usually lost forever.");
+
+    let amount;
+    try { amount = ethers.parseUnits(amtStr, a.decimals); } catch { return msg($("sendMsg"), "Enter a valid amount."); }
+    if (amount <= 0n) return msg($("sendMsg"), "Amount must be greater than zero.");
+    if (a.balance != null && amount > a.balance) return msg($("sendMsg"), `You only have ${fmt(a.balance, a.decimals)} ${a.symbol}.`);
+
+    // Warn if the recipient is a contract rather than a normal wallet
+    try {
+      const code = await provider.getCode(to);
+      if (code && code !== "0x") msg($("sendMsg"), "Heads up: the recipient is a smart contract, not a regular wallet. Make sure it can accept this asset.", "warn");
+    } catch {}
+
+    pending = { asset: a, to: ethers.getAddress(to), amount, chainId };
+    $("cNet").textContent = NETWORKS[chainId].name;
+    $("cAsset").textContent = a.symbol + (a.address ? ` (${short(a.address)})` : "");
+    $("cAmt").textContent = `${ethers.formatUnits(amount, a.decimals)} ${a.symbol}`;
+    $("cTo").textContent = pending.to;
+    show($("confirmBox"));
+  }
+
+  async function confirmSend() {
+    if (!pending) return;
+    if (pending.chainId !== chainId) { msg($("sendMsg"), "Network changed. Review the transfer again."); show($("confirmBox"), false); return; }
+    const { asset, to, amount } = pending;
+    $("confirmBtn").disabled = true;
+    msg($("sendMsg"), "Approve the transfer in your wallet…", "warn");
+    try {
+      const tx = asset.address
+        ? await new ethers.Contract(asset.address, ERC20_ABI, signer).transfer(to, amount)
+        : await signer.sendTransaction({ to, value: amount });
+
+      show($("confirmBox"), false);
+      const entry = addTx(tx.hash, asset, amount, to);
+      msg($("sendMsg"), "Submitted. Waiting for confirmation on the blockchain…", "warn");
+      $("amount").value = "";
+
+      const receipt = await tx.wait();
+      const ok = receipt && receipt.status === 1;
+      entry.querySelector(".st").textContent = ok ? "Confirmed" : "Failed";
+      msg($("sendMsg"), ok ? "Transfer confirmed on the blockchain." : "The transaction failed on-chain.", ok ? "ok" : "err");
+      await loadAssets();
+    } catch (e) {
+      msg($("sendMsg"), niceError(e));
+    } finally {
+      $("confirmBtn").disabled = false;
+      pending = null;
+    }
+  }
+
+  function addTx(hash, asset, amount, to) {
+    show($("historyCard"));
+    const net = NETWORKS[chainId];
+    const div = document.createElement("div");
+    div.className = "tx";
+    div.innerHTML = `<div><strong class="amt"></strong> to <span class="addr to"></span></div>
+      <div class="muted">Status: <span class="st">Pending</span> · ${net.name}</div>
+      <a target="_blank" rel="noopener"></a>`;
+    div.querySelector(".amt").textContent = `${ethers.formatUnits(amount, asset.decimals)} ${asset.symbol}`;
+    div.querySelector(".to").textContent = short(to);
+    const link = div.querySelector("a");
+    link.href = `${net.explorer}/tx/${hash}`;
+    link.textContent = "View on explorer: " + hash;
+    $("txList").prepend(div);
+    return div;
+  }
+
+  // ---- Events ----
+  $("connectBtn").onclick = connect;
+  $("copyBtn").onclick = async () => {
+    try { await navigator.clipboard.writeText(account); $("copyBtn").textContent = "Copied"; setTimeout(() => ($("copyBtn").textContent = "Copy"), 1500); } catch {}
+  };
+  $("networkSel").onchange = (e) => e.target.value && switchNetwork(Number(e.target.value));
+  $("refreshBtn").onclick = loadAssets;
+  $("addTokenBtn").onclick = addCustomToken;
+  $("assetSel").onchange = () => { updateAvail(); show($("confirmBox"), false); };
+  $("toAddr").oninput = $("amount").oninput = () => show($("confirmBox"), false);
+  $("maxBtn").onclick = () => {
+    const a = currentAsset();
+    if (!a || a.balance == null) return;
+    let v = a.balance;
+    if (!a.address) {
+      // keep a little native coin for the network fee
+      const reserve = ethers.parseUnits("0.002", a.decimals);
+      v = v > reserve ? v - reserve : 0n;
+    }
+    $("amount").value = ethers.formatUnits(v, a.decimals);
+    show($("confirmBox"), false);
+  };
+  $("reviewBtn").onclick = review;
+  $("confirmBtn").onclick = confirmSend;
+  $("cancelBtn").onclick = () => { show($("confirmBox"), false); pending = null; };
+
+  if (window.ethereum) {
+    window.ethereum.on?.("accountsChanged", (accs) => provider && onAccounts(accs));
+    window.ethereum.on?.("chainChanged", async (hex) => {
+      chainId = parseInt(hex, 16);
+      if (!account) return;
+      provider = new ethers.BrowserProvider(window.ethereum, "any");
+      signer = await provider.getSigner(account);
+      show($("confirmBox"), false); pending = null;
+      syncNetworkSelect();
+      await loadAssets();
+    });
+    // Reconnect silently if the site was already authorised
+    window.ethereum.request({ method: "eth_accounts" }).then((accs) => {
+      if (accs && accs.length) { provider = new ethers.BrowserProvider(window.ethereum, "any"); onAccounts(accs); }
+    }).catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
