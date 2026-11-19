@@ -53,6 +53,22 @@
   .muted { color: var(--muted); font-size: 13px; }
   .share { display: flex; gap: 8px; margin-top: 14px; }
   .share input { font-size: 13px; }
+  .receipt { max-width: 440px; margin: 0 auto; }
+  .r-title { text-align: center; font-weight: bold; font-size: 18px; margin: 4px 0 26px; }
+  .r-top { text-align: center; margin-bottom: 34px; }
+  .r-label { color: var(--muted); font-size: 15px; }
+  .r-amt { font-size: 30px; font-weight: bold; margin: 8px 0; }
+  .r-status { font-size: 17px; display: inline-flex; align-items: center; gap: 4px; }
+  .r-status.ok { color: #16a34a; } .r-status.bad { color: var(--red); } .r-status.pend { color: var(--amber); }
+  .r-dot { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 12px; background: currentColor; }
+  .r-status .r-dot { color: inherit; background: rgba(22,163,74,.15); }
+  .r-status.bad .r-dot { background: rgba(198,40,40,.12); } .r-status.pend .r-dot { background: rgba(168,100,0,.12); }
+  .r-row { display: flex; justify-content: space-between; gap: 16px; padding: 11px 0; font-size: 15px; }
+  .r-k { color: var(--muted); white-space: nowrap; }
+  .r-v { text-align: right; word-break: break-all; }
+  .r-copy { background: none; border: 0; padding: 0 0 0 6px; color: var(--muted); font-size: 15px; font-weight: normal; cursor: pointer; }
+  .r-verify { text-align: center; color: var(--muted); font-size: 12px; margin: 22px 0 12px; }
+  .r-btn { display: block; text-align: center; border: 1px solid #cfd6cf; border-radius: 999px; padding: 13px; font-weight: bold; color: var(--text); text-decoration: none; }
   footer { text-align: center; color: var(--muted); font-size: 13px; padding: 16px; }
 </style>
 </head>
@@ -105,7 +121,7 @@
   </section>
 
   <section class="card hidden" id="results">
-    <h2 id="resTitle">Results</h2>
+    <h2 id="resTitle"></h2>
     <div id="resBody"></div>
     <div class="share">
       <input id="shareUrl" readonly>
@@ -124,21 +140,21 @@
 
   const CHAINS = {
     56: {
-      name: "BNB Smart Chain (BEP20)", symbol: "BNB", explorer: "https://bscscan.com",
+      name: "BNB Smart Chain (BEP20)", label: "BSC (BEP20)", symbol: "BNB", explorer: "https://bscscan.com",
       rpcs: ["https://bsc-rpc.publicnode.com", "https://1rpc.io/bnb", "https://bsc-dataseed.bnbchain.org"],
       tokens: { "0x55d398326f99059ff775485246999027b3197955": { symbol: "USDT", decimals: 18 },
                 "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d": { symbol: "USDC", decimals: 18 } },
       chunk: 2000,
     },
     1: {
-      name: "Ethereum (ERC20)", symbol: "ETH", explorer: "https://etherscan.io",
+      name: "Ethereum (ERC20)", label: "Ethereum (ERC20)", symbol: "ETH", explorer: "https://etherscan.io",
       rpcs: ["https://ethereum-rpc.publicnode.com", "https://1rpc.io/eth", "https://eth.llamarpc.com"],
       tokens: { "0xdac17f958d2ee523a2206206994597c13d831ec7": { symbol: "USDT", decimals: 6 },
                 "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": { symbol: "USDC", decimals: 6 } },
       chunk: 2000,
     },
     137: {
-      name: "Polygon", symbol: "POL", explorer: "https://polygonscan.com",
+      name: "Polygon", label: "Polygon (PoS)", symbol: "POL", explorer: "https://polygonscan.com",
       rpcs: ["https://polygon-bor-rpc.publicnode.com", "https://1rpc.io/matic", "https://polygon-rpc.com"],
       tokens: { "0xc2132d05d31c914a87c6611c10748aeb04b58e8f": { symbol: "USDT", decimals: 6 },
                 "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359": { symbol: "USDC", decimals: 6 } },
@@ -230,37 +246,56 @@
     if (!data) { status("No transaction with this hash exists on " + c.name + ". Check the hash and the network.", "err"); return false; }
     const { tx, rc, block, transfers } = data;
     const ok = rc && rc.status === 1;
+    const fee = rc ? rc.gasUsed * (rc.gasPrice ?? tx.gasPrice ?? 0n) : null;
 
     const items = transfers.length ? transfers
       : [{ symbol: c.symbol, decimals: 18, from: tx.from, to: tx.to, value: tx.value, native: true }];
 
     for (const t of items) {
-      const box = el("div", "proof");
-      box.appendChild(el("div", "muted", "Amount"));
-      box.appendChild(el("div", "amt", `${fmtAmt(t.value, t.decimals)} ${t.symbol}`));
-      const badge = el("span", "badge " + (ok ? "ok" : "bad"), !rc ? "Pending" : ok ? "✓ Confirmed on blockchain" : "✗ Failed on blockchain");
-      box.appendChild(badge);
-      if (t.unknown) box.appendChild(el("div", "msg info", "Warning: this token is not the official USDT/USDC contract. Fake tokens can copy the name."));
-      body.appendChild(box);
+      const r = el("div", "receipt");
+      r.appendChild(el("div", "r-title", "Transfer Details"));
 
-      const dl = el("dl");
-      const add = (k, v) => { dl.appendChild(el("dt", null, k)); dl.appendChild(el("dd", null, v)); };
-      add("Network", c.name);
-      if (!t.native) add("Token contract", t.token);
-      add("From", t.from);
-      add("To", t.to || "(contract creation)");
-      add("Time", block ? `${fmtTime(block.timestamp)} (${tz()})` : "Not yet in a block");
-      add("Block", rc ? String(rc.blockNumber) : "-");
-      body.appendChild(dl);
+      const top = el("div", "r-top");
+      top.appendChild(el("div", "r-label", "Quantity"));
+      top.appendChild(el("div", "r-amt", `${fmtAmt(t.value, t.decimals)} ${t.symbol}`));
+      const st = el("div", "r-status " + (!rc ? "pend" : ok ? "ok" : "bad"));
+      st.appendChild(el("span", "r-dot", !rc ? "…" : ok ? "✓" : "✗"));
+      st.appendChild(document.createTextNode(!rc ? " Pending" : ok ? " Transfer Completed" : " Transfer Failed"));
+      top.appendChild(st);
+      r.appendChild(top);
+
+      if (t.unknown) r.appendChild(el("div", "msg err", "Warning: this token is NOT the official USDT/USDC contract. Fake tokens can copy the name."));
+
+      const rows = el("div", "r-rows");
+      const row = (k, v, copy) => {
+        const d = el("div", "r-row");
+        d.appendChild(el("span", "r-k", k));
+        const val = el("span", "r-v", v);
+        if (copy) {
+          const b = el("button", "r-copy", "⧉"); b.title = "Copy"; b.setAttribute("aria-label", "Copy " + k);
+          b.onclick = async () => { try { await navigator.clipboard.writeText(v); b.textContent = "✓"; setTimeout(() => (b.textContent = "⧉"), 1200); } catch {} };
+          val.appendChild(b);
+        }
+        d.appendChild(val); rows.appendChild(d);
+      };
+      row("From Address", t.from, true);
+      row("Network Fee", fee == null ? "-" : `${fmtAmt(fee, 18)} ${c.symbol}`);
+      row("Chain Type", c.label);
+      row("Time", block ? fmtTime(block.timestamp) : "Not yet in a block");
+      row("To Address", t.to || "(contract creation)", true);
+      if (!t.native) row("Token Contract", t.token, true);
+      row("Transaction Hash", hash, true);
+      r.appendChild(rows);
+
+      r.appendChild(el("div", "r-verify", `Read live from the ${c.label} blockchain by Electroshere · times in ${tz()}`));
+      const a = el("a", "r-btn", "View in Blockchain Explorer");
+      a.href = `${c.explorer}/tx/${hash}`; a.target = "_blank"; a.rel = "noopener";
+      r.appendChild(a);
+      body.appendChild(r);
     }
-    const hashDl = el("dl");
-    hashDl.appendChild(el("dt", null, "Transaction hash"));
-    const dd = el("dd"); const a = el("a", null, hash); a.href = `${c.explorer}/tx/${hash}`; a.target = "_blank"; a.rel = "noopener"; dd.appendChild(a);
-    hashDl.appendChild(dd);
-    body.appendChild(hashDl);
 
-    $("resTitle").textContent = "Transaction";
-    status(ok ? "Verified on the blockchain." : "Found, but not successful.", ok ? "ok" : "err");
+    $("resTitle").textContent = "";
+    status(ok ? "Verified on the blockchain." : rc ? "Found, but the transaction failed." : "Found, still pending.", ok ? "ok" : "err");
     return true;
   }
 
