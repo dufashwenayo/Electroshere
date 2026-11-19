@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Withdrawal Screen Demo</title>
+<style>
+  :root {
+    --bg: #f2f4f5;
+    --card: #ffffff;
+    --text: #111;
+    --muted: #8a8f98;
+    --green: #16a34a;
+    --red: #dc2626;
+    --border: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .wrap {
+    max-width: 440px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+  .banner {
+    background: var(--red);
+    color: #fff;
+    text-align: center;
+    font-weight: bold;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    letter-spacing: .5px;
+  }
+  .phone {
+    position: relative;
+    background: var(--card);
+    border-radius: 18px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    padding: 20px 18px 28px;
+  }
+  /* Watermark baked into the screen so it can't be cropped out */
+  .phone::before {
+    content: "DEMO · NOT A REAL TRANSACTION · DEMO · NOT A REAL TRANSACTION · DEMO · NOT A REAL TRANSACTION";
+    position: absolute;
+    inset: -50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: rotate(-30deg);
+    font-size: 26px;
+    font-weight: bold;
+    color: rgba(220, 38, 38, .14);
+    line-height: 2.4;
+    text-align: center;
+    word-spacing: 6px;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: bold;
+    font-size: 18px;
+    margin-bottom: 28px;
+  }
+  .topbar span:first-child { font-size: 22px; }
+  .topbar span:last-child { flex: 1; text-align: center; margin-right: 22px; }
+  .qty { text-align: center; margin-bottom: 36px; }
+  .qty .label { color: var(--muted); font-size: 14px; }
+  .qty .amount { font-size: 30px; font-weight: bold; margin: 6px 0; }
+  .qty .status { color: var(--red); font-weight: bold; }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 0;
+    font-size: 15px;
+  }
+  .row .k { color: var(--muted); white-space: nowrap; }
+  .row .v { text-align: right; word-break: break-all; font-family: monospace; }
+  .btn {
+    margin-top: 28px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    text-align: center;
+    padding: 12px;
+    font-weight: bold;
+    color: var(--muted);
+  }
+  .learn {
+    background: var(--card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 16px 18px;
+    margin-top: 16px;
+    line-height: 1.5;
+    font-size: 15px;
+  }
+  .learn h2 { font-size: 18px; margin: 0 0 8px; }
+  .learn ol { padding-left: 20px; margin: 8px 0; }
+  .learn code { background: var(--bg); padding: 1px 4px; border-radius: 4px; }
+  .ok { color: var(--green); font-weight: bold; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="banner">EDUCATIONAL DEMO: NOT A REAL WITHDRAWAL</div>
+
+  <div class="phone" aria-label="Demo withdrawal screen with placeholder values">
+    <div class="topbar"><span>&larr;</span><span>Withdrawal Details</span></div>
+
+    <div class="qty">
+      <div class="label">Quantity</div>
+      <div class="amount">0.00 DEMO</div>
+      <div class="status">&#9888; Sample screen: no funds moved</div>
+    </div>
+
+    <div class="row"><span class="k">Withdrawal Account</span><span class="v">Sample Account</span></div>
+    <div class="row"><span class="k">Fees</span><span class="v">0.00</span></div>
+    <div class="row"><span class="k">Chain Type</span><span class="v">EXAMPLE-CHAIN</span></div>
+    <div class="row"><span class="k">Time</span><span class="v">YYYY-MM-DD HH:MM:SS</span></div>
+    <div class="row"><span class="k">Withdrawal Address</span><span class="v">0x0000000000000000000000000000000000000000</span></div>
+    <div class="row"><span class="k">Transaction Hash</span><span class="v">0x0000000000000000000000000000000000000000000000000000000000000000</span></div>
+
+    <div class="btn">View in Blockchain Explorer (disabled in demo)</div>
+  </div>
+
+  <div class="learn">
+    <h2>Why a screenshot proves nothing</h2>
+    <p>A screen like the one above is just HTML. Anyone can make one look "completed" with any address, amount, date and time. Never accept a screenshot as proof of payment.</p>
+    <h2>How to check a real USDT (BEP20) payment</h2>
+    <ol>
+      <li>Ask the sender for the <strong>transaction hash</strong> (starts with <code>0x</code>, 66 characters).</li>
+      <li>Open <a href="https://bscscan.com" target="_blank" rel="noopener">bscscan.com</a> and paste the hash in the search box.</li>
+      <li>Check that <strong>Status</strong> says <span class="ok">Success</span>.</li>
+      <li>Under <strong>ERC-20/BEP-20 Tokens Transferred</strong>, check that the token is the real <strong>Binance-Peg BSC-USD (USDT)</strong>, not a lookalike.</li>
+      <li>Check that the <strong>To</strong> address is exactly <em>your</em> address. Compare all characters, not just the first and last few.</li>
+      <li>Check the <strong>amount</strong> and the <strong>timestamp</strong>.</li>
+      <li>Best of all: check your own wallet balance. If the money isn't there, it wasn't paid.</li>
+    </ol>
+  </div>
+</div>
+</body>
+</html>
