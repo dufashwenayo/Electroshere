@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Electroshere Payment Proof</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #e9f9e9; --card: #fff; --dark: #004d00; --green: #008000;
+    --text: #1f2a1f; --muted: #6b7a6b; --border: #d4e8d4; --red: #c62828; --amber: #a86400;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: var(--bg); color: var(--text); }
+  header { background: var(--dark); color: #fff; padding: 14px 16px; }
+  header .inner { max-width: 760px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 20px; margin: 0; }
+  header a { color: #cfe9cf; font-size: 14px; text-decoration: none; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .card h2 { margin: 0 0 10px; font-size: 18px; color: var(--dark); }
+  .note { background: #f4fff4; border-left: 4px solid var(--green); padding: 10px 12px; border-radius: 6px; font-size: 14px; margin-bottom: 16px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .tabs button { flex: 1; background: #fff; color: var(--green); border: 1px solid var(--green); }
+  .tabs button.on { background: var(--green); color: #fff; }
+  button { font: inherit; cursor: pointer; border: 0; border-radius: 8px; padding: 11px 16px; font-weight: bold; }
+  .primary { background: var(--green); color: #fff; width: 100%; margin-top: 16px; }
+  .primary:disabled { background: #9cbf9c; cursor: wait; }
+  .ghost { background: transparent; color: var(--green); border: 1px solid var(--green); }
+  label { display: block; font-size: 14px; color: var(--muted); margin: 12px 0 6px; }
+  input, select { font: inherit; width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  @media (max-width: 480px) { .grid2 { grid-template-columns: 1fr; } }
+  .hidden { display: none !important; }
+  .msg { padding: 10px 12px; border-radius: 8px; font-size: 14px; margin-top: 12px; word-break: break-word; }
+  .msg.err { background: #fdecea; color: var(--red); }
+  .msg.ok { background: #e6f4e6; color: var(--dark); }
+  .msg.info { background: #fff4e0; color: var(--amber); }
+  .proof { text-align: center; padding: 8px 0 14px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+  .proof .amt { font-size: 28px; font-weight: bold; margin: 4px 0; }
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: bold; }
+  .badge.ok { background: #e6f4e6; color: var(--green); }
+  .badge.bad { background: #fdecea; color: var(--red); }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 12px 0 0; font-size: 14px; }
+  dt { color: var(--muted); }
+  dd { margin: 0; text-align: right; word-break: break-all; font-family: monospace; }
+  a { color: var(--green); }
+  .tx { padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .tx:last-child { border-bottom: 0; }
+  .tx .top { display: flex; justify-content: space-between; gap: 10px; font-weight: bold; }
+  .in { color: var(--green); } .out { color: var(--red); }
+  .mono { font-family: monospace; word-break: break-all; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .share { display: flex; gap: 8px; margin-top: 14px; }
+  .share input { font-size: 13px; }
+  footer { text-align: center; color: var(--muted); font-size: 13px; padding: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="inner">
+    <h1>Payment Proof</h1>
+    <a href="index.html">&larr; Back to site</a>
+  </div>
+</header>
+
+<main>
+  <div class="note">
+    Every value on this page is read live from the public blockchain. Nothing shown here can be typed in or edited.
+    Each payment links to the blockchain explorer, so anyone can check it independently.
+  </div>
+
+  <section class="card">
+    <div class="tabs">
+      <button id="tabAddr" class="on">By wallet &amp; date</button>
+      <button id="tabTx">By transaction hash</button>
+    </div>
+
+    <label for="chain">Network</label>
+    <select id="chain"></select>
+
+    <div id="addrForm">
+      <label for="addr">Wallet address</label>
+      <input id="addr" placeholder="0x…" spellcheck="false" autocomplete="off">
+      <div class="grid2">
+        <div><label for="from">From (your local time)</label><input id="from" type="datetime-local"></div>
+        <div><label for="to">To (your local time)</label><input id="to" type="datetime-local"></div>
+      </div>
+      <label for="dir">Show</label>
+      <select id="dir">
+        <option value="in">Payments received</option>
+        <option value="out">Payments sent</option>
+        <option value="both">Both</option>
+      </select>
+      <div class="muted" style="margin-top:6px">Range is limited to 72 hours per search so it stays fast.</div>
+    </div>
+
+    <div id="txForm" class="hidden">
+      <label for="hash">Transaction hash</label>
+      <input id="hash" placeholder="0x… (66 characters)" spellcheck="false" autocomplete="off">
+    </div>
+
+    <button class="primary" id="goBtn">Look up on blockchain</button>
+    <div id="status"></div>
+  </section>
+
+  <section class="card hidden" id="results">
+    <h2 id="resTitle">Results</h2>
+    <div id="resBody"></div>
+    <div class="share">
+      <input id="shareUrl" readonly>
+      <button class="ghost" id="copyShare">Copy link</button>
+    </div>
+    <div class="muted" style="margin-top:6px">Share this link: anyone who opens it re-checks the same data on the blockchain.</div>
+  </section>
+</main>
+
+<footer>&copy; 2026 Electroshere Company Ltd</footer>
+
+<script>
+(() => {
+  const { ethers } = window;
+  const TRANSFER = ethers.id("Transfer(address,address,uint256)");
+
+  const CHAINS = {
+    56: {
+      name: "BNB Smart Chain (BEP20)", symbol: "BNB", explorer: "https://bscscan.com",
+      rpcs: ["https://bsc-rpc.publicnode.com", "https://1rpc.io/bnb", "https://bsc-dataseed.bnbchain.org"],
+      tokens: { "0x55d398326f99059ff775485246999027b3197955": { symbol: "USDT", decimals: 18 },
+                "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d": { symbol: "USDC", decimals: 18 } },
+      chunk: 2000,
+    },
+    1: {
+      name: "Ethereum (ERC20)", symbol: "ETH", explorer: "https://etherscan.io",
+      rpcs: ["https://ethereum-rpc.publicnode.com", "https://1rpc.io/eth", "https://eth.llamarpc.com"],
+      tokens: { "0xdac17f958d2ee523a2206206994597c13d831ec7": { symbol: "USDT", decimals: 6 },
+                "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": { symbol: "USDC", decimals: 6 } },
+      chunk: 2000,
+    },
+    137: {
+      name: "Polygon", symbol: "POL", explorer: "https://polygonscan.com",
+      rpcs: ["https://polygon-bor-rpc.publicnode.com", "https://1rpc.io/matic", "https://polygon-rpc.com"],
+      tokens: { "0xc2132d05d31c914a87c6611c10748aeb04b58e8f": { symbol: "USDT", decimals: 6 },
+                "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359": { symbol: "USDC", decimals: 6 } },
+      chunk: 2000,
+    },
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const show = (el, on = true) => el.classList.toggle("hidden", !on);
+  let mode = "addr";
+
+  for (const [id, c] of Object.entries(CHAINS)) {
+    const o = document.createElement("option"); o.value = id; o.textContent = c.name; $("chain").appendChild(o);
+  }
+  $("chain").value = "56"; // BNB Smart Chain by default
+
+  function status(text, kind = "info") {
+    $("status").innerHTML = text ? `<div class="msg ${kind}"></div>` : "";
+    if (text) $("status").firstChild.textContent = text;
+  }
+  function setMode(m) {
+    mode = m;
+    $("tabAddr").classList.toggle("on", m === "addr");
+    $("tabTx").classList.toggle("on", m === "tx");
+    show($("addrForm"), m === "addr"); show($("txForm"), m === "tx");
+    status("");
+  }
+  $("tabAddr").onclick = () => setMode("addr");
+  $("tabTx").onclick = () => setMode("tx");
+
+  // ---- RPC with fallback across public endpoints ----
+  async function rpc(chainId, fn) {
+    let lastErr;
+    for (const url of CHAINS[chainId].rpcs) {
+      try {
+        const p = new ethers.JsonRpcProvider(url, Number(chainId), { staticNetwork: true, batchMaxCount: 1 });
+        return await fn(p);
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr;
+  }
+
+  const fmtAmt = (v, d) => {
+    const [i, f = ""] = ethers.formatUnits(v, d).split(".");
+    const t = f.slice(0, 6).replace(/0+$/, "");
+    return Number(i).toLocaleString("en-US") + (t ? "." + t : "");
+  };
+  const fmtTime = (ts) => {
+    const d = new Date(ts * 1000);
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+  const tz = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "local time";
+  const topicAddr = (a) => ethers.zeroPadValue(a.toLowerCase(), 32);
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+  async function tokenInfo(p, chainId, addr) {
+    const known = CHAINS[chainId].tokens[addr.toLowerCase()];
+    if (known) return known;
+    try {
+      const c = new ethers.Contract(addr, ["function symbol() view returns (string)", "function decimals() view returns (uint8)"], p);
+      const [symbol, decimals] = await Promise.all([c.symbol(), c.decimals()]);
+      return { symbol, decimals: Number(decimals), unknown: true };
+    } catch { return { symbol: "Unknown token", decimals: 18, unknown: true }; }
+  }
+
+  // ---- Mode 1: single transaction ----
+  async function lookupTx(chainId, hash) {
+    const c = CHAINS[chainId];
+    const data = await rpc(chainId, async (p) => {
+      const [tx, rc] = await Promise.all([p.getTransaction(hash), p.getTransactionReceipt(hash)]);
+      if (!tx) return null;
+      const block = rc ? await p.getBlock(rc.blockNumber) : null;
+      const transfers = [];
+      for (const log of rc ? rc.logs : []) {
+        if (log.topics[0] !== TRANSFER || log.topics.length !== 3) continue;
+        const info = await tokenInfo(p, chainId, log.address);
+        transfers.push({
+          token: log.address, ...info,
+          from: ethers.getAddress(ethers.dataSlice(log.topics[1], 12)),
+          to: ethers.getAddress(ethers.dataSlice(log.topics[2], 12)),
+          value: BigInt(log.data),
+        });
+      }
+      return { tx, rc, block, transfers };
+    });
+
+    const body = $("resBody"); body.innerHTML = "";
+    if (!data) { status("No transaction with this hash exists on " + c.name + ". Check the hash and the network.", "err"); return false; }
+    const { tx, rc, block, transfers } = data;
+    const ok = rc && rc.status === 1;
+
+    const items = transfers.length ? transfers
+      : [{ symbol: c.symbol, decimals: 18, from: tx.from, to: tx.to, value: tx.value, native: true }];
+
+    for (const t of items) {
+      const box = el("div", "proof");
+      box.appendChild(el("div", "muted", "Amount"));
+      box.appendChild(el("div", "amt", `${fmtAmt(t.value, t.decimals)} ${t.symbol}`));
+      const badge = el("span", "badge " + (ok ? "ok" : "bad"), !rc ? "Pending" : ok ? "✓ Confirmed on blockchain" : "✗ Failed on blockchain");
+      box.appendChild(badge);
+      if (t.unknown) box.appendChild(el("div", "msg info", "Warning: this token is not the official USDT/USDC contract. Fake tokens can copy the name."));
+      body.appendChild(box);
+
+      const dl = el("dl");
+      const add = (k, v) => { dl.appendChild(el("dt", null, k)); dl.appendChild(el("dd", null, v)); };
+      add("Network", c.name);
+      if (!t.native) add("Token contract", t.token);
+      add("From", t.from);
+      add("To", t.to || "(contract creation)");
+      add("Time", block ? `${fmtTime(block.timestamp)} (${tz()})` : "Not yet in a block");
+      add("Block", rc ? String(rc.blockNumber) : "-");
+      body.appendChild(dl);
+    }
+    const hashDl = el("dl");
+    hashDl.appendChild(el("dt", null, "Transaction hash"));
+    const dd = el("dd"); const a = el("a", null, hash); a.href = `${c.explorer}/tx/${hash}`; a.target = "_blank"; a.rel = "noopener"; dd.appendChild(a);
+    hashDl.appendChild(dd);
+    body.appendChild(hashDl);
+
+    $("resTitle").textContent = "Transaction";
+    status(ok ? "Verified on the blockchain." : "Found, but not successful.", ok ? "ok" : "err");
+    return true;
+  }
+
+  // ---- Mode 2: wallet + date range ----
+  async function blockAt(p, ts, latest) {
+    // binary search for the first block with timestamp >= ts
+    let lo = 1, hi = latest.number;
+    if (ts >= latest.timestamp) return latest.number;
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      const b = await p.getBlock(mid);
+      if (b.timestamp < ts) lo = mid + 1; else hi = mid;
+    }
+    return lo;
+  }
+
+  async function lookupAddr(chainId, addr, fromTs, toTs, dir) {
+    const c = CHAINS[chainId];
+    const tokens = Object.keys(c.tokens);
+    const results = await rpc(chainId, async (p) => {
+      const latest = await p.getBlock("latest");
+      status("Finding the blocks for your date range…");
+      const startB = await blockAt(p, fromTs, latest);
+      const endB = Math.max(startB, (await blockAt(p, toTs, latest)) - (toTs >= latest.timestamp ? 0 : 1));
+
+      const filters = [];
+      if (dir !== "out") filters.push({ topics: [TRANSFER, null, topicAddr(addr)], kind: "in" });
+      if (dir !== "in") filters.push({ topics: [TRANSFER, topicAddr(addr)], kind: "out" });
+
+      const logs = [];
+      const total = Math.ceil((endB - startB + 1) / c.chunk);
+      let done = 0;
+      for (let b = startB; b <= endB; b += c.chunk) {
+        const e = Math.min(b + c.chunk - 1, endB);
+        for (const f of filters) {
+          const got = await p.getLogs({ address: tokens, topics: f.topics, fromBlock: b, toBlock: e });
+          got.forEach((l) => logs.push({ ...l, kind: f.kind }));
+        }
+        done++;
+        status(`Scanning the blockchain… ${Math.round((done / total) * 100)}%`);
+      }
+
+      const blockTimes = {};
+      for (const bn of [...new Set(logs.map((l) => l.blockNumber))]) blockTimes[bn] = (await p.getBlock(bn)).timestamp;
+      return logs.map((l) => ({
+        ...c.tokens[l.address.toLowerCase()],
+        kind: l.kind,
+        from: ethers.getAddress(ethers.dataSlice(l.topics[1], 12)),
+        to: ethers.getAddress(ethers.dataSlice(l.topics[2], 12)),
+        value: BigInt(l.data),
+        hash: l.transactionHash,
+        time: blockTimes[l.blockNumber],
+      })).sort((a, b) => b.time - a.time);
+    });
+
+    const body = $("resBody"); body.innerHTML = "";
+    $("resTitle").textContent = `Payments for ${addr.slice(0, 6)}…${addr.slice(-4)}`;
+    body.appendChild(el("div", "muted", `${c.name} · ${fmtTime(fromTs)} → ${fmtTime(toTs)} (${tz()})`));
+
+    if (!results.length) {
+      body.appendChild(el("p", null, "No USDT/USDC transfers found in this period."));
+      status("Search complete.", "ok");
+      return true;
+    }
+
+    const totals = {};
+    for (const r of results) {
+      const k = `${r.kind}:${r.symbol}`;
+      totals[k] = totals[k] || { ...r, sum: 0n, n: 0 };
+      totals[k].sum += r.value; totals[k].n++;
+    }
+    const sumBox = el("div", "proof");
+    for (const t of Object.values(totals)) {
+      sumBox.appendChild(el("div", "muted", `${t.kind === "in" ? "Total received" : "Total sent"} (${t.n} payment${t.n > 1 ? "s" : ""})`));
+      sumBox.appendChild(el("div", "amt " + t.kind, `${fmtAmt(t.sum, t.decimals)} ${t.symbol}`));
+    }
+    sumBox.appendChild(el("span", "badge ok", "✓ Read from blockchain"));
+    body.appendChild(sumBox);
+
+    for (const r of results) {
+      const row = el("div", "tx");
+      const top = el("div", "top");
+      top.appendChild(el("span", r.kind, `${r.kind === "in" ? "+" : "−"}${fmtAmt(r.value, r.decimals)} ${r.symbol}`));
+      top.appendChild(el("span", "muted", fmtTime(r.time)));
+      row.appendChild(top);
+      row.appendChild(el("div", "mono muted", `${r.kind === "in" ? "From" : "To"}: ${r.kind === "in" ? r.from : r.to}`));
+      const a = el("a", "mono", "View on explorer ↗"); a.href = `${c.explorer}/tx/${r.hash}`; a.target = "_blank"; a.rel = "noopener";
+      row.appendChild(a);
+      body.appendChild(row);
+    }
+    status(`Found ${results.length} transfer${results.length > 1 ? "s" : ""}.`, "ok");
+    return true;
+  }
+
+  // ---- Run + share links ----
+  async function run() {
+    const chainId = $("chain").value;
+    const btn = $("goBtn");
+    show($("results"), false);
+    const params = new URLSearchParams({ chain: chainId });
+
+    try {
+      btn.disabled = true;
+      let ok;
+      if (mode === "tx") {
+        const hash = $("hash").value.trim();
+        if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) { status("A transaction hash starts with 0x and has 66 characters.", "err"); return; }
+        status("Reading the transaction from the blockchain…");
+        params.set("tx", hash);
+        ok = await lookupTx(chainId, hash);
+      } else {
+        const addr = $("addr").value.trim();
+        if (!ethers.isAddress(addr)) { status("That wallet address is not valid. It starts with 0x and has 42 characters.", "err"); return; }
+        const f = $("from").value, t = $("to").value;
+        if (!f || !t) { status("Pick both a start and an end date/time.", "err"); return; }
+        const fromTs = Math.floor(new Date(f).getTime() / 1000), toTs = Math.floor(new Date(t).getTime() / 1000);
+        if (toTs <= fromTs) { status("The end must be after the start.", "err"); return; }
+        if (toTs - fromTs > 72 * 3600) { status("Please choose a range of 72 hours or less.", "err"); return; }
+        if (fromTs > Date.now() / 1000) { status("The start is in the future.", "err"); return; }
+        params.set("address", addr); params.set("from", fromTs); params.set("to", toTs); params.set("dir", $("dir").value);
+        ok = await lookupAddr(chainId, ethers.getAddress(addr), fromTs, toTs, $("dir").value);
+      }
+      if (ok) {
+        const url = `${location.origin}${location.pathname}?${params}`;
+        $("shareUrl").value = url;
+        history.replaceState(null, "", "?" + params);
+        show($("results"));
+      }
+    } catch (e) {
+      console.error(e);
+      status("Could not reach the blockchain right now. Please try again in a moment, or try a shorter date range.", "err");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  $("goBtn").onclick = run;
+  $("copyShare").onclick = async () => {
+    try { await navigator.clipboard.writeText($("shareUrl").value); $("copyShare").textContent = "Copied"; setTimeout(() => ($("copyShare").textContent = "Copy link"), 1500); } catch {}
+  };
+
+  // Default range: last 24 hours
+  const toLocalInput = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  const now = new Date();
+  $("to").value = toLocalInput(now);
+  $("from").value = toLocalInput(new Date(now - 24 * 3600 * 1000));
+
+  // Auto-run from a shared link
+  const q = new URLSearchParams(location.search);
+  if (q.get("chain") && CHAINS[q.get("chain")]) $("chain").value = q.get("chain");
+  if (q.get("tx")) { setMode("tx"); $("hash").value = q.get("tx"); run(); }
+  else if (q.get("address")) {
+    $("addr").value = q.get("address");
+    if (q.get("from")) $("from").value = toLocalInput(new Date(Number(q.get("from")) * 1000));
+    if (q.get("to")) $("to").value = toLocalInput(new Date(Number(q.get("to")) * 1000));
+    if (q.get("dir")) $("dir").value = q.get("dir");
+    run();
+  }
+})();
+</script>
+</body>
+</html>
