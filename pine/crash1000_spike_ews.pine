@@ -20,7 +20,7 @@
 // ============================================================================
 indicator("CRASH 1000 Spike Early-Warning System", shorttitle = "C1000 Spike EWS", overlay = true, max_labels_count = 100, max_bars_back = 500)
 
-// ───────────────────────────── INPUT GROUPS ─────────────────────────────────
+// ----------------------------- INPUT GROUPS ---------------------------------
 const string G_DET  = "1. Detection Engine"
 const string G_LEN  = "2. Lookbacks"
 const string G_SPK  = "3. Spike Confirmation"
@@ -33,7 +33,7 @@ const string G_EVL  = "9. Historical Evaluation"
 
 // 1. Detection engine
 detSens    = input.float(1.0, "Detection sensitivity", minval = 0.25, maxval = 3.0, step = 0.05, group = G_DET, tooltip = "Scales the composite score. Higher = scores rise faster = more signals.")
-earlySens  = input.float(1.0, "Early-warning sensitivity", minval = 0.5, maxval = 2.0, step = 0.05, group = G_DET, tooltip = "Lowers the SPIKE WATCH threshold and the number of aligned factors required for a HIGH ALERT. 1.0 = neutral.")
+earlySens  = input.float(1.0, "Early-warning sensitivity", minval = 0.5, maxval = 2.0, step = 0.05, group = G_DET)
 minProb    = input.int(50, "Minimum score for SPIKE WATCH (yellow)", minval = 5, maxval = 95, group = G_DET)
 redProb    = input.int(70, "Minimum score for HIGH SPIKE ALERT (red)", minval = 10, maxval = 99, group = G_DET)
 minFactors = input.int(4, "Aligned factors required for HIGH ALERT", minval = 1, maxval = 10, group = G_DET)
@@ -47,7 +47,7 @@ structLen  = input.int(30, "Structure / recent-high lookback", minval = 5, maxva
 runNorm    = input.int(12, "Up-run length treated as 'extended'", minval = 3, maxval = 100, group = G_LEN)
 
 // 3. Spike confirmation
-spikeMult  = input.float(4.0, "Spike confirmation threshold (x baseline range)", minval = 1.5, maxval = 50.0, step = 0.25, group = G_SPK, tooltip = "A bar is a confirmed spike when its drop (from max(open, prev close) to close) is at least this multiple of the robust baseline bar range (75th percentile of true range). Tune until the dashboard's 'Mean spike interval' matches the instrument (~16-17 bars on 1m for Crash 1000).")
+spikeMult  = input.float(4.0, "Spike confirmation threshold (x baseline range)", minval = 1.5, maxval = 50.0, step = 0.25, group = G_SPK)
 cooldown   = input.int(3, "Post-spike cooldown (bars, no warnings)", minval = 0, maxval = 50, group = G_SPK)
 
 // 4. Weights
@@ -64,7 +64,7 @@ wMtf    = input.float(0.8, "W10 Multi-timeframe confirmation", minval = 0.0, max
 
 // 5. MTF
 useMtf  = input.bool(true, "Use higher-timeframe confirmation", group = G_MTF)
-htfTf   = input.timeframe("5", "Confirmation timeframe", group = G_MTF, tooltip = "Must be higher than the chart timeframe, otherwise the factor is ignored. Uses the last CLOSED HTF bar only (no repaint).")
+htfTf   = input.timeframe("5", "Confirmation timeframe", group = G_MTF)
 
 // 6. Visuals
 showWatch = input.bool(true, "Show SPIKE WATCH markers (yellow)", group = G_VIS)
@@ -87,10 +87,10 @@ alertRed   = input.bool(true, "Alert: high-probability spike warning", group = G
 alertSpike = input.bool(true, "Alert: confirmed downward spike", group = G_ALR)
 
 // 9. Evaluation
-evalWin   = input.int(5, "Evaluation window (bars after warning)", minval = 1, maxval = 100, group = G_EVL, tooltip = "A warning counts as correct if a confirmed spike occurs within this many bars after it starts. A spike counts as caught if a warning was active in this many bars before it.")
+evalWin   = input.int(5, "Evaluation window (bars after warning)", minval = 1, maxval = 100, group = G_EVL)
 hazBucket = input.int(5, "Hazard age bucket size (bars)", minval = 1, maxval = 50, group = G_EVL)
 
-// ───────────────────────────── HELPERS ──────────────────────────────────────
+// ----------------------------- HELPERS --------------------------------------
 clamp01(float x) =>
     float v = nz(x)
     math.max(0.0, math.min(1.0, v))
@@ -101,10 +101,10 @@ zScore(float src, int len) =>
     s > 0 ? (src - m) / s : 0.0
 
 pct(float x) =>
-    na(x) ? "—" : str.tostring(x * 100.0, "0.0") + "%"
+    na(x) ? "-" : str.tostring(x * 100.0, "0.0") + "%"
 
 num(float x, string f) =>
-    na(x) ? "—" : str.tostring(x, f)
+    na(x) ? "-" : str.tostring(x, f)
 
 // Higher-timeframe "pressure" (position in range, up-bar ratio, RSI)
 htfPressure() =>
@@ -148,10 +148,10 @@ evalLevel(bool active, bool startEv, bool spikeEv, int win) =>
                 missed += 1
     [warns, hits, falses, leadSum, detected, missed]
 
-// ───────────────────────────── BAR STATE ────────────────────────────────────
+// ----------------------------- BAR STATE ------------------------------------
 bool liveBar = barstate.isrealtime and not barstate.isconfirmed
 
-// ───────────────────────────── SPIKE DETECTION (CONFIRMATION) ───────────────
+// ----------------------------- SPIKE DETECTION (CONFIRMATION) ---------------
 float prevClose  = nz(close[1], open)
 float trv        = ta.tr(true)
 float baseTRraw  = ta.percentile_nearest_rank(trv, volLen, 75)
@@ -184,7 +184,7 @@ float chg      = close - prevClose
 float cleanChg = spikeCond ? 0.0 : chg
 float trClean  = spikeCond ? baseTR : trv
 
-// ───────────────────────────── FACTOR 1: MOMENTUM & ACCELERATION ────────────
+// ----------------------------- FACTOR 1: MOMENTUM & ACCELERATION ------------
 float cleanRoc = math.sum(cleanChg, momLen)
 float rocZ     = zScore(cleanRoc, volLen)
 float velFast  = ta.ema(cleanChg, 3)
@@ -193,7 +193,7 @@ float chgSd    = ta.stdev(cleanChg, volLen)
 float decel    = velSlow > 0 and chgSd > 0 ? (velSlow - velFast) / chgSd : 0.0
 float fMom     = 0.6 * clamp01((rocZ - 0.5) / 2.0) + 0.4 * clamp01(decel * 2.0)
 
-// ───────────────────────────── FACTOR 2: CONSECUTIVE UP-MOVES ───────────────
+// ----------------------------- FACTOR 2: CONSECUTIVE UP-MOVES ---------------
 var int upRun = 0
 if close > prevClose
     upRun += 1
@@ -202,7 +202,7 @@ else if close < prevClose
 float upRatio = math.sum(close > prevClose ? 1.0 : 0.0, momLen) / momLen
 float fRun    = 0.6 * clamp01(float(upRun) / runNorm) + 0.4 * clamp01((upRatio - 0.5) / 0.5)
 
-// ───────────────────────────── FACTOR 3: CANDLE BODY & WICK ─────────────────
+// ----------------------------- FACTOR 3: CANDLE BODY & WICK -----------------
 float body       = math.abs(close - open)
 float rng        = high - low
 float upperWick  = high - math.max(open, close)
@@ -217,7 +217,7 @@ float rejection  = ta.sma(upWr, 3)
 float dips       = ta.sma(loWr, 3)
 float fCandle    = 0.4 * bodyShrink + 0.35 * clamp01(rejection * 2.0) + 0.25 * clamp01(dips * 2.0)
 
-// ───────────────────────────── FACTOR 4: VOLATILITY REGIME ──────────────────
+// ----------------------------- FACTOR 4: VOLATILITY REGIME ------------------
 float volS     = ta.sma(trClean, 5)
 float volL     = ta.sma(trClean, volLen)
 float volRatio = volL > 0 ? volS / volL : 1.0
@@ -225,33 +225,37 @@ float fComp    = clamp01((0.85 - volRatio) / 0.45)
 float fExpand  = clamp01((volRatio - 1.2) / 1.0)
 float fVol     = math.max(fComp, fExpand)
 
-// ───────────────────────────── FACTOR 5: TICK VOLUME ────────────────────────
+// ----------------------------- FACTOR 5: TICK VOLUME ------------------------
 float vol       = nz(volume)
 float cumVol    = ta.cum(vol)
 bool  hasVolume = cumVol > 0
 float volZ      = zScore(vol, volLen)
 float fTick     = hasVolume ? clamp01((math.abs(volZ) - 0.5) / 2.5) : 0.0
 
-// ───────────────────────────── FACTOR 6: SHORT-TERM STRUCTURE ───────────────
+// ----------------------------- FACTOR 6: SHORT-TERM STRUCTURE ---------------
 float hiN        = ta.highest(high, structLen)
 float emaFast    = ta.ema(close, 9)
 bool  failedHigh = not na(hiN[1]) and high[1] >= hiN[1] and high < high[1]
 bool  breakLow   = close < low[1]
 bool  belowFast  = close < emaFast
 bool  lowerHigh  = high < high[1] and high[1] < high[2]
-float fStruct    = 0.35 * (failedHigh ? 1.0 : 0.0) + 0.25 * (breakLow ? 1.0 : 0.0) + 0.2 * (belowFast ? 1.0 : 0.0) + 0.2 * (lowerHigh ? 1.0 : 0.0)
+float fStruct    = 0.0
+fStruct += failedHigh ? 0.35 : 0.0
+fStruct += breakLow ? 0.25 : 0.0
+fStruct += belowFast ? 0.2 : 0.0
+fStruct += lowerHigh ? 0.2 : 0.0
 
-// ───────────────────────────── FACTOR 7: STRETCH / DISTANCE FROM HIGHS ──────
+// ----------------------------- FACTOR 7: STRETCH / DISTANCE FROM HIGHS ------
 float stretchZ = zScore(close, structLen)
 float distHigh = (nz(hiN, high) - close) / baseTR
 float fDist    = 0.6 * clamp01((stretchZ - 1.0) / 1.5) + 0.4 * clamp01(1.0 - distHigh / 3.0)
 
-// ───────────────────────────── FACTOR 8: ABNORMAL MOVEMENT ──────────────────
+// ----------------------------- FACTOR 8: ABNORMAL MOVEMENT ------------------
 float chgZ = zScore(cleanChg, volLen)
 float rngZ = zScore(trClean, volLen)
 float fAbn = math.max(clamp01((math.abs(chgZ) - 1.5) / 2.0), clamp01((rngZ - 1.5) / 2.0))
 
-// ───────────────────────────── FACTOR 9: STATISTICAL HAZARD ─────────────────
+// ----------------------------- FACTOR 9: STATISTICAL HAZARD -----------------
 // Empirical hazard h(age) = P(spike this bar | bars since last spike).
 // For a memoryless (random) process h(age) is flat, so this factor stays ~0.
 // It only contributes if the chart's own history shows age-dependent risk.
@@ -268,24 +272,35 @@ if ageBucket >= 0 and hazCnt > 0
 float hazRatio = pBar > 0 ? hazNow / pBar : na
 float fStat    = clamp01(nz(hazRatio, 1.0) - 1.0)
 
-// ───────────────────────────── FACTOR 10: MULTI-TIMEFRAME ───────────────────
+// ----------------------------- FACTOR 10: MULTI-TIMEFRAME -------------------
 float htfRaw   = request.security(syminfo.tickerid, htfTf, htfPressure()[1], lookahead = barmerge.lookahead_on)
 bool  mtfValid = useMtf and timeframe.in_seconds(htfTf) > timeframe.in_seconds(timeframe.period)
 float fMtf     = mtfValid ? clamp01(htfRaw) : 0.0
 
-// ───────────────────────────── WEIGHTED COMPOSITE SCORE ─────────────────────
+// ----------------------------- WEIGHTED COMPOSITE SCORE ---------------------
 float wTickEff = hasVolume ? wTick : 0.0
 float wMtfEff  = mtfValid ? wMtf : 0.0
 float wSum     = wMom + wRun + wCandle + wVol + wTickEff + wStruct + wDist + wAbn + wStat + wMtfEff
-float wTotal   = wMom * fMom + wRun * fRun + wCandle * fCandle + wVol * fVol + wTickEff * fTick + wStruct * fStruct + wDist * fDist + wAbn * fAbn + wStat * fStat + wMtfEff * fMtf
+float wTotal   = wMom * fMom + wRun * fRun + wCandle * fCandle + wVol * fVol + wTickEff * fTick
+wTotal += wStruct * fStruct + wDist * fDist + wAbn * fAbn + wStat * fStat + wMtfEff * fMtf
 float rawScore = wSum > 0 ? wTotal / wSum : 0.0
 float scoreIns = 100.0 * (1.0 - math.exp(-2.2 * detSens * rawScore))
 float score    = ta.ema(scoreIns, smoothLen)
 
-int aligned = (fMom >= factorOn ? 1 : 0) + (fRun >= factorOn ? 1 : 0) + (fCandle >= factorOn ? 1 : 0) + (fVol >= factorOn ? 1 : 0) + (hasVolume and fTick >= factorOn ? 1 : 0) + (fStruct >= factorOn ? 1 : 0) + (fDist >= factorOn ? 1 : 0) + (fAbn >= factorOn ? 1 : 0) + (fStat >= factorOn ? 1 : 0) + (mtfValid and fMtf >= factorOn ? 1 : 0)
+int aligned = 0
+aligned += fMom >= factorOn ? 1 : 0
+aligned += fRun >= factorOn ? 1 : 0
+aligned += fCandle >= factorOn ? 1 : 0
+aligned += fVol >= factorOn ? 1 : 0
+aligned += hasVolume and fTick >= factorOn ? 1 : 0
+aligned += fStruct >= factorOn ? 1 : 0
+aligned += fDist >= factorOn ? 1 : 0
+aligned += fAbn >= factorOn ? 1 : 0
+aligned += fStat >= factorOn ? 1 : 0
+aligned += mtfValid and fMtf >= factorOn ? 1 : 0
 int factorTotal = 8 + (hasVolume ? 1 : 0) + (mtfValid ? 1 : 0)
 
-// ───────────────────────────── SIGNAL STATE MACHINE ─────────────────────────
+// ----------------------------- SIGNAL STATE MACHINE -------------------------
 float watchThr   = math.max(5.0, math.min(95.0, minProb / earlySens))
 float redThr     = math.max(watchThr, float(redProb))
 int   minAligned = math.max(1, math.round(minFactors / earlySens))
@@ -306,7 +321,7 @@ bool redMarker     = redStart and barstate.isconfirmed
 float watchActSum = math.sum(state >= 1 ? 1.0 : 0.0, evalWin)
 bool  caught      = nz(watchActSum[1]) > 0                // warning active before spike
 
-// ───────────────────────────── HISTORICAL EVALUATION ────────────────────────
+// ----------------------------- HISTORICAL EVALUATION ------------------------
 [wWarn, wHit, wFalse, wLead, wDet, wMiss] = evalLevel(state >= 1, watchStartAny, spikeCond, evalWin)
 [rWarn, rHit, rFalse, rLead, rDet, rMiss] = evalLevel(state == 2, redStart, spikeCond, evalWin)
 
@@ -353,7 +368,7 @@ if spikeC
     lastSpikeX    := dropClose / baseTR
     spikeCount    += 1
 
-// ───────────────────────────── CHART SIGNALS ────────────────────────────────
+// ----------------------------- CHART SIGNALS --------------------------------
 color C_GREEN = #22C55E
 color C_YEL   = #FACC15
 color C_RED   = #EF4444
@@ -365,10 +380,15 @@ color C_HDR   = color.new(#1F2937, 0)
 
 plotshape(showWatch and watchMarker, "Spike Watch (confirmed)", shape.triangledown, location.abovebar, color.new(C_YEL, 0), text = "WATCH", textcolor = C_YEL, size = size.small)
 plotshape(showAlert and redMarker, "High Spike Alert (confirmed)", shape.arrowdown, location.abovebar, color.new(C_RED, 0), text = "SPIKE ALERT", textcolor = C_RED, size = size.large)
-plotshape(showSpike and spikeC and caught, "Confirmed spike (warned)", shape.labelup, location.belowbar, color.new(C_SPK, 10), text = "SPIKE ✓", textcolor = color.white, size = size.small)
+plotshape(showSpike and spikeC and caught, "Confirmed spike (warned)", shape.labelup, location.belowbar, color.new(C_SPK, 10), text = "SPIKE (warned)", textcolor = color.white, size = size.small)
 plotshape(showSpike and spikeC and not caught, "Confirmed spike (not warned)", shape.labelup, location.belowbar, color.new(C_DIM, 20), text = "SPIKE", textcolor = color.white, size = size.small)
 
-bgcolor(showBg ? (state == 2 ? color.new(C_RED, 88) : state == 1 ? color.new(C_YEL, 93) : na) : na, title = "Signal level background")
+color bgCol = na
+if showBg and state == 2
+    bgCol := color.new(C_RED, 88)
+else if showBg and state == 1
+    bgCol := color.new(C_YEL, 93)
+bgcolor(bgCol, title = "Signal level background")
 
 // Data-window outputs (not drawn on the price scale)
 plot(score, "Detection Score", color = C_YEL, display = display.data_window)
@@ -404,7 +424,7 @@ if barstate.islast
         label.set_color(liveLbl, color(na))
         label.set_textcolor(liveLbl, color(na))
 
-// ───────────────────────────── ALERTS ───────────────────────────────────────
+// ----------------------------- ALERTS ---------------------------------------
 // alertcondition(): choose "Once Per Bar Close" for confirmed signals,
 // or "Once Per Bar" for the earliest provisional (live-bar) warning.
 alertcondition(watchStartAny, "1. Potential spike developing", 'CRASH 1000 | SPIKE WATCH: potential spike developing on {{ticker}} {{interval}} | score {{plot("Detection Score")}} | price {{close}}')
@@ -414,15 +434,20 @@ alertcondition(spikeCond, "3. Confirmed downward spike", "CRASH 1000 | DOWNWARD 
 bool   liveMode  = alertMode == "Live (provisional, earliest)"
 string alertFreq = liveMode ? alert.freq_once_per_bar : alert.freq_once_per_bar_close
 string tagTxt    = liveMode ? " [provisional]" : " [confirmed]"
+string infoTxt   = tagTxt + " | " + syminfo.ticker + " " + timeframe.period + " | score " + str.tostring(score, "0") + "/100 | factors " + str.tostring(aligned) + "/" + str.tostring(factorTotal)
+string priceTxt  = " | price " + str.tostring(close, format.mintick)
+float  alertDrop = liveMode ? dropLow : dropClose
+bool   spikeAlrt = liveMode ? spikeTouch : spikeCond
+string dropTxt   = " | drop " + str.tostring(alertDrop, format.mintick) + " pts (" + str.tostring(alertDrop / baseTR, "0.0") + "x baseline)"
 if useAlertFn
     if alertWatch and watchStartAny and state == 1
-        alert(str.format("CRASH 1000 SPIKE WATCH{0} | {1} {2} | score {3}/100 | factors {4}/{5} | price {6}", tagTxt, syminfo.ticker, timeframe.period, str.tostring(score, "0"), aligned, factorTotal, str.tostring(close, format.mintick)), alertFreq)
+        alert("CRASH 1000 SPIKE WATCH" + infoTxt + priceTxt, alertFreq)
     if alertRed and redStart
-        alert(str.format("CRASH 1000 HIGH SPIKE ALERT{0} | {1} {2} | score {3}/100 | factors {4}/{5} | price {6}", tagTxt, syminfo.ticker, timeframe.period, str.tostring(score, "0"), aligned, factorTotal, str.tostring(close, format.mintick)), alertFreq)
-    if alertSpike and (liveMode ? spikeTouch : spikeCond)
-        alert(str.format("CRASH 1000 DOWNWARD SPIKE{0} | {1} {2} | drop {3} pts ({4}x baseline) | price {5}", tagTxt, syminfo.ticker, timeframe.period, str.tostring(liveMode ? dropLow : dropClose, format.mintick), str.tostring((liveMode ? dropLow : dropClose) / baseTR, "0.0"), str.tostring(close, format.mintick)), alertFreq)
+        alert("CRASH 1000 HIGH SPIKE ALERT" + infoTxt + priceTxt, alertFreq)
+    if alertSpike and spikeAlrt
+        alert("CRASH 1000 DOWNWARD SPIKE" + tagTxt + dropTxt + priceTxt, alertFreq)
 
-// ───────────────────────────── DASHBOARD ────────────────────────────────────
+// ----------------------------- DASHBOARD ------------------------------------
 string dashPos = switch dashPosIn
     "Top Left"     => position.top_left
     "Bottom Right" => position.bottom_right
@@ -446,12 +471,26 @@ if barstate.isfirst
 
 if showDash and barstate.islast
     color  stCol  = state == 2 ? C_RED : state == 1 ? C_YEL : C_GREEN
-    string stTxt  = state == 2 ? "RED — HIGH SPIKE ALERT" : state == 1 ? "YELLOW — SPIKE WATCH" : "GREEN — NORMAL"
+    string stTxt  = state == 2 ? "RED - HIGH SPIKE ALERT" : state == 1 ? "YELLOW - SPIKE WATCH" : "GREEN - NORMAL"
     string modeTx = liveBar ? "provisional (live bar)" : "confirmed (closed bar)"
     int    gauge  = math.max(0, math.min(10, math.round(score / 10.0)))
-    string gTxt   = str.repeat("█", gauge) + str.repeat("░", 10 - gauge)
+    string gTxt   = str.repeat("#", gauge) + str.repeat(".", 10 - gauge)
 
-    string condTx = spikeLive or (liveBar and spikeCond) ? "SPIKE IN PROGRESS" : spikeCond ? "Spike bar" : inCooldown ? "Post-spike reset" : state == 2 ? "Exhaustion — high risk" : state == 1 ? "Pressure building" : fComp > 0.5 ? "Compressed drift" : fExpand > 0.5 ? "Volatile drift" : "Normal upward drift"
+    string condTx = "Normal upward drift"
+    if spikeLive or (liveBar and spikeCond)
+        condTx := "SPIKE IN PROGRESS"
+    else if spikeCond
+        condTx := "Spike bar"
+    else if inCooldown
+        condTx := "Post-spike reset"
+    else if state == 2
+        condTx := "Exhaustion - high risk"
+    else if state == 1
+        condTx := "Pressure building"
+    else if fComp > 0.5
+        condTx := "Compressed drift"
+    else if fExpand > 0.5
+        condTx := "Volatile drift"
     string momTx  = rocZ > 1.5 ? "Stretched / overextended" : decel > 0.5 ? "Decelerating (exhaustion)" : velSlow > 0 ? "Rising (normal drift)" : "Weak / falling"
     color  momCol = rocZ > 1.5 or decel > 0.5 ? C_YEL : velSlow > 0 ? C_GREEN : C_DIM
     string volTx  = volRatio < 0.85 ? "Compressed" : volRatio > 1.2 ? "Expanding" : "Normal"
@@ -474,12 +513,12 @@ if showDash and barstate.islast
         else if v > b2
             b2 := v
             i2 := i
-    string drvTx = array.get(fn, i1) + " " + str.tostring(b1 * 100.0, "0") + " · " + array.get(fn, i2) + " " + str.tostring(b2 * 100.0, "0")
+    string drvTx = array.get(fn, i1) + " " + str.tostring(b1 * 100.0, "0") + " | " + array.get(fn, i2) + " " + str.tostring(b2 * 100.0, "0")
 
     string lsTime = lastSpikeBar >= 0 ? str.format_time(lastSpikeTime, "yyyy-MM-dd HH:mm", syminfo.timezone) : "none in history"
-    string lsAgo  = lastSpikeBar >= 0 ? str.tostring(bar_index - lastSpikeBar) + " bars ago" : "—"
-    string lsSize = lastSpikeBar >= 0 ? str.tostring(lastSpikeSize, format.mintick) + " pts" : "—"
-    string lsX    = lastSpikeBar >= 0 ? str.tostring(lastSpikeX, "0.0") + "x baseline" : "—"
+    string lsAgo  = lastSpikeBar >= 0 ? str.tostring(bar_index - lastSpikeBar) + " bars ago" : "-"
+    string lsSize = lastSpikeBar >= 0 ? str.tostring(lastSpikeSize, format.mintick) + " pts" : "-"
+    string lsX    = lastSpikeBar >= 0 ? str.tostring(lastSpikeX, "0.0") + "x baseline" : "-"
 
     float ivMean = intervalN > 0 ? intervalSum / intervalN : na
     float ivSd   = intervalN > 1 ? math.sqrt(math.max(0.0, intervalSq / intervalN - ivMean * ivMean)) : na
@@ -492,7 +531,7 @@ if showDash and barstate.islast
     setCell(0, 1, "Spike score", C_DIM, na)
     setCell(1, 1, str.tostring(score, "0") + " / 100", stCol, na)
     setCell(2, 1, gTxt, stCol, na)
-    setCell(0, 2, "P(spike ≤ " + str.tostring(evalWin) + " bars)", C_DIM, na)
+    setCell(0, 2, "P(spike <= " + str.tostring(evalWin) + " bars)", C_DIM, na)
     setCell(1, 2, pct(probN), C_TXT, na)
     setCell(2, 2, "base " + pct(baseRateN), C_DIM, na)
     setCell(0, 3, "Signal level", C_DIM, na)
@@ -524,10 +563,10 @@ if showDash and barstate.islast
     setCell(2, 11, lsX, C_DIM, na)
     setCell(0, 12, "Mean spike interval", C_DIM, na)
     setCell(1, 12, num(ivMean, "0.0") + " bars", C_TXT, na)
-    setCell(2, 12, "CV " + num(ivCv, "0.00") + " (≈1 = random)", C_DIM, na)
+    setCell(2, 12, "CV " + num(ivCv, "0.00") + " (~1 = random)", C_DIM, na)
     setCell(0, 13, "Detection timeframe", C_DIM, na)
     setCell(1, 13, tfTx, C_TXT, na)
-    setCell(2, 13, mtfTx + (hasVolume ? " · tick vol ON" : " · no volume"), C_DIM, na)
+    setCell(2, 13, mtfTx + (hasVolume ? " | tick vol ON" : " | no volume"), C_DIM, na)
     setCell(0, 14, "Hazard vs average", C_DIM, na)
     setCell(1, 14, num(hazRatio, "0.00") + "x", C_TXT, na)
     setCell(2, 14, "per-bar p " + pct(pBar), C_DIM, na)
@@ -575,6 +614,12 @@ if showDash and barstate.islast
         setCell(1, 25, num(wLift, "0.00") + "x", not na(wLift) and wLift > 1.1 ? C_GREEN : C_TXT, na)
         setCell(2, 25, num(rLift, "0.00") + "x", not na(rLift) and rLift > 1.1 ? C_GREEN : C_TXT, na)
         setCell(0, 26, "Detection accuracy", C_DIM, na)
-        setCell(1, 26, "F1 " + num(not na(wPrec) and not na(wRec) and wPrec + wRec > 0 ? 2.0 * wPrec * wRec / (wPrec + wRec) : na, "0.00"), C_TXT, na)
-        setCell(2, 26, "F1 " + num(not na(rPrec) and not na(rRec) and rPrec + rRec > 0 ? 2.0 * rPrec * rRec / (rPrec + rRec) : na, "0.00"), C_TXT, na)
-        setCell(0, 27, "Lift ≈ 1.0 means no edge over random timing. Measured on this chart's loaded bars only.", C_DIM, na)
+        float wF1 = na
+        if not na(wPrec) and not na(wRec) and wPrec + wRec > 0
+            wF1 := 2.0 * wPrec * wRec / (wPrec + wRec)
+        float rF1 = na
+        if not na(rPrec) and not na(rRec) and rPrec + rRec > 0
+            rF1 := 2.0 * rPrec * rRec / (rPrec + rRec)
+        setCell(1, 26, "F1 " + num(wF1, "0.00"), C_TXT, na)
+        setCell(2, 26, "F1 " + num(rF1, "0.00"), C_TXT, na)
+        setCell(0, 27, "Lift ~ 1.0 means no edge over random timing. Measured on this chart's loaded bars only.", C_DIM, na)
